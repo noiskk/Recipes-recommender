@@ -1,5 +1,8 @@
 # Recipes-recommender
 
+[Dataset](https://www.kaggle.com/datasets/shuyangli94/food-com-recipes-and-user-interactions/data?select=RAW_interactions.csv)
+
+
 1. 전처리
     1. 결측치 처리
     2. 이상치 처리
