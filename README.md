@@ -22,3 +22,9 @@
     2. hybrid 적용
 4. Web service
     1. fastapi 로 web 으로 추천시스템 표현해보기
+
+
+12.7~12.10 전처리
+12.11~12.15 Modeling
+12.16~12.19 evaluation
+12.20~12.23 웹 구현
