@@ -1,58 +1,67 @@
 import pandas as pd
 import numpy as np
 import ast
-from sklearn.metrics.pairwise import cosine_similarity
 from scipy.sparse import csr_matrix
-
-# recipes_df
-# name, id, minutes, contributor_id, submitted, tags, nutrition, n_steps, steps, description, ingredients, n_ingredients
-# 필요 없는 열 : contributor_id, submitted, tags
-# reviews_df
-# user_id, recipe_id, date, rating, review
-# 필요 없는 열 : date, review
-# memory-based 할 때는 reviews_df 만 써도 될 듯?
-# content-based 할 때는 recipes_df 만 쓰고
+from content_based import content_based_recommendations
+from item_based import item_based_recommendations
+from user_based import user_based_recommendations
+from recipe_rating import calculate_avg_ratings
+from preprocessing import preprocessing
 
 def main():
+   # preprocessing()
 
-  pd.set_option('display.max_columns', None)  # 모든 열 출력
+   recipes_df = pd.read_csv("dataset/recipes.csv")
+   reviews_df = pd.read_csv("dataset/reviews.csv")
 
-  # Loading the data
-  recipes_df = pd.read_csv("dataset/RAW_recipes.csv")
-  reviews_df = pd.read_csv("dataset/RAW_interactions.csv")
+   # user_item_matrix = pp_reviews_df.pivot_table(index='user_id', columns='recipe_id', values='rating').fillna(0)
+   # 위 방식은 용량이 너무 큼. -> sparse matrix 사용  
+   sparse_user_item_matrix = csr_matrix((reviews_df['rating'], 
+      (reviews_df['user_id'], reviews_df['recipe_id'])))
 
-  # preprocessing
-  pp_recipes_df = recipes_df.drop(columns= ['contributor_id', 'submitted', 'tags'])
-  pp_recipes_df = pp_recipes_df.fillna({"name" : "no name", "description" : "no description"})
-  pp_reviews_df = reviews_df.drop(columns= ['date', 'review'])
+   # 샘플 유저 100명 선택
+   sample_users = reviews_df['user_id'].drop_duplicates().sample(n=100, random_state=42).values 
 
-  # user_item_matrix = pp_reviews_df.pivot_table(index='user_id', columns='recipe_id', values='rating').fillna(0)
-  # 위 방식은 용량이 너무 큼. -> sparse matrix 사용
+   # precision과 recall 평가 함수
+   def evaluate_recommendations(true_items, recommended_items):
+      true_set = set(true_items)
+      recommended_set = set(recommended_items)
 
-  sparse_user_item_matrix = csr_matrix((pp_reviews_df['rating'], 
-     (pp_reviews_df['user_id'], pp_reviews_df['recipe_id'])))
-  
-  # user-based
-  def user_based_recommendations(user_id, matrix, top_k=5):
-     # 사용자 간 코사인 유사도 계산
-     user_similarity = cosine_similarity(matrix)
-     similar_users = user_similarity[user_id]  # 주어진 사용자와 다른 사용자의 유사도
+      # precision과 recall 계산
+      precision = len(true_set.intersection(recommended_set)) / len(recommended_set) if recommended_set else 0
+      recall = len(true_set.intersection(recommended_set)) / len(true_set) if true_set else 0
+      return precision, recall
 
-     # 유사도를 기준으로 정렬
-     similar_users[user_id] = 0 # 자기 자신 제외
-     similar_users_id = similar_users.argsort()[::-1] # 높은 유사도 순으로 정렬
-
-     # 비슷한 사용자가 평가한 아이템 기반 추천
-     scores = matrix[similar_users_id].toarray().sum(axis=0) # 비슷한 사용자들의 평가 합산
-     
-     recommended_items = scores.argsort()[::-1][:top_k]
-     return recommended_items
-
-  recommended_items = user_based_recommendations(0, sparse_user_item_matrix, top_k=5)
-  print("user-based : ", recommended_items)
-
-
-
-
+   # 샘플 유저 100명 선택
+   sample_users = reviews_df['user_id'].drop_duplicates().sample(n=100, random_state=42).values
+   # 추천 및 평가 결과 저장
+   results = []   
+   for user_id in sample_users:
+       true_items = reviews_df[reviews_df['user_id'] == user_id]['recipe_id'].values   
+       # 추천 수행
+       recommended_items_user = user_based_recommendations(user_id, sparse_user_item_matrix, top_k=5)
+       recommended_items_item = item_based_recommendations(1, sparse_user_item_matrix, top_k=5)  # 예시로 recipe_id 1
+       recommended_items_content = content_based_recommendations(user_id, recipes_df, reviews_df, top_k=5)  
+       # 평가
+       precision_user, recall_user = evaluate_recommendations(true_items, recommended_items_user)
+       precision_item, recall_item = evaluate_recommendations(true_items, recommended_items_item)
+       precision_content, recall_content = evaluate_recommendations(true_items, recommended_items_content)  
+       # 결과 저장
+       results.append({
+           'user_id': user_id,
+           'precision_user': precision_user,
+           'recall_user': recall_user,
+           'precision_item': precision_item,
+           'recall_item': recall_item,
+           'precision_content': precision_content,
+           'recall_content': recall_content
+       })   
+   # 결과를 데이터프레임으로 변환
+   results_df = pd.DataFrame(results)  
+   # 평균 precision과 recall 계산
+   average_results = results_df.mean()
+   print("평균 Precision 및 Recall:")
+   print(average_results)  
+   
 if __name__ == "__main__":
-    main()
+   main()
