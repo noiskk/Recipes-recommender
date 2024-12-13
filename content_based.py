@@ -1,38 +1,57 @@
 import pandas as pd
+import numpy as np
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
 
-def prepare_recipe_ratings(recipes_df, reviews_df):
-    # reviews_df와 recipes_df 병합
-    merged_df = pd.merge(reviews_df, recipes_df, left_on='recipe_id', right_on='id')
+class ContentBasedRecommender:
+    def __init__(self, recipes_df):
+        # 데이터 로드
+        self.recipes_df = recipes_df
+        
+        # 콘텐츠 벡터화
+        self.tfidf_vectorizer = TfidfVectorizer(stop_words='english')
+        self.content_matrix = self._create_content_matrix()
+    
+    def _create_content_matrix(self):
+        # 레시피 내용 결합 (예: 이름, 재료, 요리 설명 등)
+        self.recipes_df['content'] = self.recipes_df['name'] + ' ' + \
+                                     self.recipes_df['ingredients'].fillna('') + ' ' + \
+                                     self.recipes_df['steps'].fillna('')
+        
+        # TF-IDF 벡터화
+        content_matrix = self.tfidf_vectorizer.fit_transform(
+            self.recipes_df['content']
+        )
+        return content_matrix
+    
+    def recommend_recipes(self, recipe_id, n_recommendations=5):
+        # 주어진 레시피의 인덱스 찾기
+        recipe_indices = self.recipes_df[
+            self.recipes_df['recipe_id'] == recipe_id
+        ].index
 
-    # 레시피별 평균 평점 계산
-    recipe_ratings = merged_df.groupby('recipe_id')['rating'].mean().reset_index()
-    recipe_ratings.columns = ['recipe_id', 'average_rating']
-
-    # 레시피 정보와 평균 평점 병합
-    recipes_with_ratings = pd.merge(recipes_df, recipe_ratings, left_on='id', right_on='recipe_id', how='left')
-    return recipes_with_ratings
-
-def content_based_recommendations(user_id, recipes_df, pp_reviews_df, top_k=5):
-    # 레시피 평점 준비
-    recipes_with_ratings = prepare_recipe_ratings(recipes_df, pp_reviews_df)
-
-    user_ratings = pp_reviews_df[pp_reviews_df['user_id'] == user_id]
-    user_recipes = recipes_with_ratings[recipes_with_ratings['id'].isin(user_ratings['recipe_id'])]
-
-    # 평점에 영향을 주는 요소를 선택 (예: ingredients, n_steps, minutes 등)
-    features = user_recipes[['average_rating', 'n_ingredients', 'minutes']]  # 예시로 선택한 요소들
-
-    # 유사도 계산을 위한 피처 스케일링
-    from sklearn.preprocessing import StandardScaler
-    scaler = StandardScaler()
-    scaled_features = scaler.fit_transform(features)
-
-    # 코사인 유사도 계산
-    from sklearn.metrics.pairwise import cosine_similarity
-    similarity_matrix = cosine_similarity(scaled_features)
-
-    # 추천할 아이템 선택
-    recommended_indices = similarity_matrix.argsort()[:, -top_k-1:-1][:, ::-1]  # 상위 K개 추천
-    recommended_items = user_recipes.iloc[recommended_indices.flatten()]['id'].values
-
-    return recommended_items
+        # 레시피를 찾지 못한 경우 빈 리스트 반환
+        if len(recipe_indices) == 0:
+            return []
+        
+        recipe_index = recipe_indices[0]
+        
+        # 코사인 유사도 계산
+        similarity_scores = cosine_similarity(
+            self.content_matrix[recipe_index], 
+            self.content_matrix
+        ).flatten()
+        
+        # 가장 유사한 레시피 찾기 (자기 자신 제외)
+        similar_indices = similarity_scores.argsort()[::-1][1:n_recommendations+1]
+        
+        # 추천 레시피 상세 정보 추가
+        recommended_recipes = []
+        for idx in similar_indices:
+            recommended_recipes.append({
+                'recipe_id': self.recipes_df.loc[idx, 'recipe_id'],
+                'recipe_name': self.recipes_df.loc[idx, 'name'],
+                'similarity_score': similarity_scores[idx]
+            })
+        
+        return recommended_recipes

@@ -1,29 +1,70 @@
-from sklearn.metrics.pairwise import cosine_similarity
+import pandas as pd
 import numpy as np
+from sklearn.metrics.pairwise import cosine_similarity
 
-def user_based_recommendations(user_id, matrix, top_k=5):
-    # 사용자 간 코사인 유사도 계산
-    user_similarity = cosine_similarity(matrix, dense_output=False)
+class UserBasedRecommender:
+    def __init__(self, reviews_df, recipes_df):
+        # 데이터 로드
+        self.reviews_df = reviews_df
+        self.recipes_df = recipes_df
+        
+        # 사용자-레시피 평점 행렬 생성
+        self.user_recipe_matrix = self._create_user_recipe_matrix()
+        
+    def _create_user_recipe_matrix(self):
+        # 사용자-레시피 평점 행렬 생성
+        user_recipe_matrix = self.reviews_df.pivot(
+            index='user_id', 
+            columns='recipe_id', 
+            values='rating'
+        ).fillna(0)
 
-    # user_id와 인덱스 매핑 생성
-    user_ids = matrix.nonzero()[0]  # 희소 행렬의 사용자 인덱스
-    user_id_to_index = {user_id: index for index, user_id in enumerate(user_ids)}
-
-    # user_id를 인덱스로 변환
-    if user_id in user_id_to_index:
-        user_index = user_id_to_index[user_id]
-    else:
-        raise ValueError(f"User ID {user_id} is not in the user-item matrix.")
-
-    # 유사한 사용자 찾기
-    similar_users = user_similarity[user_index].toarray().flatten()  # 주어진 사용자와 다른 사용자의 유사도
-
-    # 유사도를 기준으로 정렬
-    similar_users[user_index] = 0  # 자기 자신 제외
-    similar_users_id = np.argsort(similar_users)[::-1]  # 높은 유사도 순으로 정렬
-
-    # 비슷한 사용자가 평가한 아이템 기반 추천
-    scores = matrix[similar_users_id].sum(axis=0)  # 비슷한 사용자들의 평가 합산
+        return user_recipe_matrix
     
-    recommended_items = np.argsort(scores)[::-1][:top_k]
-    return recommended_items
+    def get_similar_users(self, user_id, n_users=100):
+        # 코사인 유사도를 이용한 유사한 사용자 찾기
+        user_similarities = cosine_similarity(
+            self.user_recipe_matrix.loc[user_id].values.reshape(1, -1), 
+            self.user_recipe_matrix.values
+        )[0]
+        
+        # 가장 유사한 사용자들 찾기 (자기 자신 제외)
+        similar_users_indices = user_similarities.argsort()[::-1][1:n_users+1]
+        similar_users = self.user_recipe_matrix.index[similar_users_indices]
+        
+        return similar_users
+    
+    def recommend_recipes(self, user_id, n_recommendations=5):
+        similar_users = self.get_similar_users(user_id)
+
+        # 사용자가 아직 평가하지 않은 레시피 찾기
+        user_rated_recipes = self.user_recipe_matrix.loc[user_id]
+        unrated_recipes = user_rated_recipes[user_rated_recipes == 0].index
+        
+        # 유사 사용자들의 추천 레시피 계산
+        recommendations = {}
+        for recipe_id in unrated_recipes:
+            recipe_ratings = self.user_recipe_matrix.loc[similar_users, recipe_id]
+            avg_rating = recipe_ratings[recipe_ratings > 0].mean()
+            # if not np.isnan(avg_rating):  # 평균이 nan이 아닌 경우에만 추가
+            recommendations[recipe_id] = avg_rating
+
+        # 평점 기준으로 상위 n개 레시피 추천
+        top_recommendations = sorted(
+            recommendations.items(), 
+            key=lambda x: x[1], 
+            reverse=True
+        )[:n_recommendations]
+
+        # 레시피 상세 정보 추가
+        recommended_recipes = []
+        for recipe_id, score in top_recommendations:
+            recipe_info = self.recipes_df[self.recipes_df['recipe_id'] == recipe_id]
+            if not recipe_info.empty:
+                recommended_recipes.append({
+                    'recipe_id': recipe_id,
+                    'recipe_name': recipe_info['name'].values[0],
+                    'recommendation_score': score
+                })
+
+        return recommended_recipes
