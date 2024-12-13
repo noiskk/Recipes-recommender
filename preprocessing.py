@@ -16,13 +16,21 @@ def preprocessing():
   recipes_df = pd.read_csv("dataset/RAW_recipes.csv")
   reviews_df = pd.read_csv("dataset/RAW_interactions.csv")
 
+  # 레시피 데이터에서 1/100 추출 (랜덤 샘플링)
+  sampled_recipes = recipes_df.sample(frac=0.01, random_state=42)  # 10%만 랜덤으로 추출
+  sampled_recipe_ids = set(sampled_recipes['id'])  # 남은 레시피 ID 추출
+
+  # 리뷰 데이터 필터링
+  filtered_reviews = reviews_df[reviews_df['recipe_id'].isin(sampled_recipe_ids)]
+
   # 데이터 전처리
-  pp_recipes_df = recipes_df.drop(columns= ['contributor_id', 'submitted', 'tags'])
-  pp_recipes_df = pp_recipes_df.fillna({"name" : "no name", "description" : "no description"})
-  pp_reviews_df = reviews_df.drop(columns= ['date', 'review'])  
+  pp_recipes_df = sampled_recipes.drop(columns= ['contributor_id', 'submitted', 'tags'])
+  pp_recipes_df = sampled_recipes.fillna({"name" : "no name", "description" : "no description"})
+  pp_reviews_df = filtered_reviews.drop(columns= ['date', 'review'])  
   
   # 평균 평점 계산 및 추가
-  recipes_with_ratings = calculate_avg_ratings(recipes_df, reviews_df)
+  recipes_with_ratings = calculate_avg_ratings(pp_recipes_df, pp_reviews_df)
+
   # 결과를 새로운 CSV 파일로 저장
   recipes_with_ratings.to_csv("dataset/recipes.csv", index=False)
   pp_reviews_df.to_csv("dataset/reviews.csv", index=False)
