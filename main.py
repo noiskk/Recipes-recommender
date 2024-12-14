@@ -82,7 +82,7 @@ def main():
         print(f"- {rec['recipe_id']} (Score: {rec.get('recommendation_score', rec.get('similarity_score'))})")
      
     print("\nItem-Based 추천:")
-    item_based_recs = recomm_system.recommend_item_based(example_recipe_id)
+    item_based_recs = recomm_system.recommend_item_based(example_user_id)
     for rec in item_based_recs:
         print(f"- {rec['recipe_id']} (Score: {rec.get('recommendation_score', rec.get('similarity_score'))})")
     
