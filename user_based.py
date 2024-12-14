@@ -39,8 +39,9 @@ class UserBasedRecommender:
 
         # 사용자가 아직 평가하지 않은 레시피 찾기
         user_rated_recipes = self.user_recipe_matrix.loc[user_id]
+        print(user_rated_recipes)
         unrated_recipes = user_rated_recipes[user_rated_recipes == 0].index
-        
+
         # 유사 사용자들의 추천 레시피 계산
         recommendations = {}
         for recipe_id in unrated_recipes:

@@ -13,6 +13,8 @@ class ItemBasedRecommender:
         
         # 레시피 간 유사도 계산
         self.recipe_similarity_matrix = self._compute_recipe_similarity()
+
+        print(self.recipe_similarity_matrix)
     
     def _create_recipe_user_matrix(self):
         # 레시피-사용자 평점 행렬 생성
@@ -35,7 +37,8 @@ class ItemBasedRecommender:
     def recommend_recipes(self, user_id, n_recommendations=5):
         # 사용자가 이미 평가한 레시피 찾기
         user_rated_recipes = self.reviews_df[self.reviews_df['user_id'] == user_id]['recipe_id'].unique()
-        
+        print(user_rated_recipes)
+
         # 유사한 레시피 추천
         recommendations = {}
         for recipe_id in user_rated_recipes:
