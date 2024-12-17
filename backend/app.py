@@ -49,16 +49,23 @@ async def get_recipes(
 @app.post("/recommend")
 async def get_recommendations(submission: RecipeSubmission):
     try:
+        print(f"Received recipe_ids: {submission.recipe_ids}")
+        
         # 각 추천 방식별 결과
         user_based_recs = recommender.recommend_user_based_from_history(
             submission.recipe_ids
         )
+        print(f"User-based recommendations: {user_based_recs}")
+        
         item_based_recs = recommender.recommend_item_based_from_history(
             submission.recipe_ids
         )
+        print(f"Item-based recommendations: {item_based_recs}")
+        
         content_based_recs = recommender.recommend_content_based_from_history(
             submission.recipe_ids
         )
+        print(f"Content-based recommendations: {content_based_recs}")
         
         return {
             "user_based": user_based_recs,
@@ -66,6 +73,7 @@ async def get_recommendations(submission: RecipeSubmission):
             "content_based": content_based_recs
         }
     except Exception as e:
+        print(f"Error in recommendations: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/ratings")

@@ -72,4 +72,47 @@ class UserBasedRecommender:
     
     def recommend_recipes_from_profile(self, user_profile, n_recommendations=5):
         """임시 사용자 프로필을 기반으로 추천"""
-        # 프로필을 기반으로 한 추천 로직 구현
+        # 임시 사용자 벡터 생성
+        temp_user_vector = np.zeros(len(self.user_recipe_matrix.columns))
+        for recipe_id, rating in user_profile.items():
+            if recipe_id in self.user_recipe_matrix.columns:
+                col_idx = self.user_recipe_matrix.columns.get_loc(recipe_id)
+                temp_user_vector[col_idx] = rating
+        
+        # 유사도 계산
+        similarities = cosine_similarity([temp_user_vector], self.user_recipe_matrix.values)[0]
+        
+        # 가장 유사한 사용자들의 평점 가져오기
+        similar_users_indices = similarities.argsort()[::-1][:10]  # 상위 10명
+        similar_users = self.user_recipe_matrix.index[similar_users_indices]
+        
+        # 추천 계산
+        recommendations = {}
+        rated_recipes = list(user_profile.keys())
+        
+        for recipe_id in self.user_recipe_matrix.columns:
+            if recipe_id not in rated_recipes:
+                ratings = self.user_recipe_matrix.loc[similar_users, recipe_id]
+                avg_rating = ratings[ratings > 0].mean()
+                if not np.isnan(avg_rating):
+                    recommendations[recipe_id] = avg_rating
+        
+        # 상위 n개 추천
+        top_recommendations = sorted(
+            recommendations.items(), 
+            key=lambda x: x[1], 
+            reverse=True
+        )[:n_recommendations]
+        
+        # 추천 결과 포맷팅
+        result = []
+        for recipe_id, score in top_recommendations:
+            recipe_info = self.recipes_df[self.recipes_df['recipe_id'] == recipe_id]
+            if not recipe_info.empty:
+                result.append({
+                    'recipe_id': recipe_id,
+                    'recipe_name': recipe_info['name'].values[0],
+                    'recommendation_score': score
+                })
+        
+        return result
