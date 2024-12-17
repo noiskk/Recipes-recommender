@@ -3,6 +3,7 @@ from user_based import UserBasedRecommender
 from item_based import ItemBasedRecommender
 from content_based import ContentBasedRecommender
 from evaluation import RecommenderEvaluator
+from typing import List
 
 class RecipeRecommendationSystem:
     def __init__(self, reviews_path, recipes_path):
@@ -62,6 +63,45 @@ class RecipeRecommendationSystem:
         }
         
         return evaluation_results
+    
+    def get_recipe_list(self, page: int = 1, limit: int = 20):
+        """페이지네이션된 레시피 목록 반환"""
+        start_idx = (page - 1) * limit
+        end_idx = start_idx + limit
+        
+        return self.recipes_df.iloc[start_idx:end_idx][
+            ['recipe_id', 'name', 'description', 'ingredients']
+        ].to_dict('records')
+    
+    def recommend_user_based_from_history(
+        self, recipe_ids: List[int], n_recommendations: int = 5
+    ):
+        """사용자가 선택한 레시피들을 기반으로 추천"""
+        # 임시 사용자 프로필 생성
+        temp_user_profile = self._create_temp_user_profile(recipe_ids)
+        return self.user_based_recommender.recommend_recipes_from_profile(
+            temp_user_profile, n_recommendations
+        )
+    
+    def recommend_item_based_from_history(
+        self, recipe_ids: List[int], n_recommendations: int = 5
+    ):
+        """아이템 기반 협업 필터링"""
+        return self.item_based_recommender.recommend_recipes_from_history(
+            recipe_ids, n_recommendations
+        )
+    
+    def recommend_content_based_from_history(
+        self, recipe_ids: List[int], n_recommendations: int = 5
+    ):
+        """컨텐츠 기반 필터링"""
+        return self.content_based_recommender.recommend_recipes_from_history(
+            recipe_ids, n_recommendations
+        )
+    
+    def _create_temp_user_profile(self, recipe_ids: List[int]):
+        """임시 사용자 프로필 생성"""
+        return {recipe_id: 5.0 for recipe_id in recipe_ids}  # 선택한 레시피에 최고 점수 부여
 
 def main():
     # 데이터 경로 설정

@@ -69,3 +69,7 @@ class UserBasedRecommender:
                 })
 
         return recommended_recipes
+    
+    def recommend_recipes_from_profile(self, user_profile, n_recommendations=5):
+        """임시 사용자 프로필을 기반으로 추천"""
+        # 프로필을 기반으로 한 추천 로직 구현

@@ -29,3 +29,6 @@
 12.16 ~ 12.19 evaluation <br>
 12.20 ~ 12.23 웹 구현 <br>
 
+FastAPI 서버 실행
+: uvicorn app:app --reload
+
