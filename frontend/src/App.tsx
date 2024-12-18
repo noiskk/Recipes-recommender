@@ -8,11 +8,17 @@ interface Recipe {
   ingredients: string;
 }
 
+interface Similarity {
+  with_recipe: string;
+  similarity: number;
+}
+
 interface Recommendation {
   recipe_id: number;
   recipe_name: string;
-  recommendation_score?: number;
   similarity_score?: number;
+  hybrid_score?: number;
+  similarities: Similarity[];
 }
 
 function App() {
@@ -22,6 +28,7 @@ function App() {
     user_based: Recommendation[];
     item_based: Recommendation[];
     content_based: Recommendation[];
+    hybrid: Recommendation[];
   } | null>(null);
 
   useEffect(() => {
@@ -89,13 +96,21 @@ function App() {
       {recommendations && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
-            <h3 className="font-bold mb-2">사용자 기반 추천</h3>
-            {recommendations.user_based.map(rec => (
+            <h3 className="font-bold mb-2">하이브리드 추천</h3>
+            {recommendations.hybrid.map(rec => (
               <div key={rec.recipe_id} className="p-2 border rounded mb-2">
-                <p>{rec.recipe_name}</p>
+                <p className="font-medium">{rec.recipe_name}</p>
                 <p className="text-sm text-gray-600">
-                  점수: {rec.recommendation_score?.toFixed(2)}
+                  종합 점수: {rec.hybrid_score?.toFixed(2)}
                 </p>
+                <div className="mt-2">
+                  <p className="text-xs font-medium">선택한 레시피와의 유사도:</p>
+                  {rec.similarities.map((sim, idx) => (
+                    <p key={idx} className="text-xs text-gray-500">
+                      {sim.with_recipe}: {sim.similarity.toFixed(2)}
+                    </p>
+                  ))}
+                </div>
               </div>
             ))}
           </div>
@@ -104,10 +119,18 @@ function App() {
             <h3 className="font-bold mb-2">아이템 기반 추천</h3>
             {recommendations.item_based.map(rec => (
               <div key={rec.recipe_id} className="p-2 border rounded mb-2">
-                <p>{rec.recipe_name}</p>
+                <p className="font-medium">{rec.recipe_name}</p>
                 <p className="text-sm text-gray-600">
-                  점수: {rec.similarity_score?.toFixed(2)}
+                  종합 점수: {rec.similarity_score?.toFixed(2)}
                 </p>
+                <div className="mt-2">
+                  <p className="text-xs font-medium">선택한 레시피와의 유사도:</p>
+                  {rec.similarities.map((sim, idx) => (
+                    <p key={idx} className="text-xs text-gray-500">
+                      {sim.with_recipe}: {sim.similarity.toFixed(2)}
+                    </p>
+                  ))}
+                </div>
               </div>
             ))}
           </div>
@@ -116,10 +139,18 @@ function App() {
             <h3 className="font-bold mb-2">컨텐츠 기반 추천</h3>
             {recommendations.content_based.map(rec => (
               <div key={rec.recipe_id} className="p-2 border rounded mb-2">
-                <p>{rec.recipe_name}</p>
+                <p className="font-medium">{rec.recipe_name}</p>
                 <p className="text-sm text-gray-600">
-                  점수: {rec.similarity_score?.toFixed(2)}
+                  종합 점수: {rec.similarity_score?.toFixed(2)}
                 </p>
+                <div className="mt-2">
+                  <p className="text-xs font-medium">선택한 레시피와의 유사도:</p>
+                  {rec.similarities.map((sim, idx) => (
+                    <p key={idx} className="text-xs text-gray-500">
+                      {sim.with_recipe}: {sim.similarity.toFixed(2)}
+                    </p>
+                  ))}
+                </div>
               </div>
             ))}
           </div>

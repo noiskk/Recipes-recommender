@@ -13,92 +13,98 @@ class ContentBasedRecommender:
         self.content_matrix = self._create_content_matrix()
     
     def _create_content_matrix(self):
-        # 레시피 내용 결합 (예: 이름, 재료, 요리 설명 등)
-        self.recipes_df['content'] = self.recipes_df['name'] + ' ' + \
-                                     self.recipes_df['ingredients'].fillna('') + ' ' + \
-                                     self.recipes_df['steps'].fillna('')
+        # 레시피 내용 결합 (이름, 재료, 조리 방법, 태그)
+        self.recipes_df['content'] = (
+            self.recipes_df['name'] + ' ' + 
+            self.recipes_df['ingredients'].fillna('') + ' ' + 
+            self.recipes_df['steps'].fillna('') + ' ' + 
+            self.recipes_df['tags'].fillna('').apply(lambda x: ' '.join(eval(x)) if x else '')
+        )
         
         # TF-IDF 벡터화
         content_matrix = self.tfidf_vectorizer.fit_transform(
             self.recipes_df['content']
         )
+        
         return content_matrix
     
-    def recommend_recipes(self, recipe_id, n_recommendations=5):
-        # 주어진 레시피의 인덱스 찾기
-        recipe_indices = self.recipes_df[
-            self.recipes_df['recipe_id'] == recipe_id
-        ].index
-
-        # 레시피를 찾지 못한 경우 빈 리스트 반환
-        if len(recipe_indices) == 0:
-            return []
+    def get_similarity(self, recipe_id1, recipe_id2):
+        """두 레시시피 간의 유사도 반환"""
+        idx1 = self.recipes_df[self.recipes_df['recipe_id'] == recipe_id1].index
+        idx2 = self.recipes_df[self.recipes_df['recipe_id'] == recipe_id2].index
         
-        recipe_index = recipe_indices[0]
-        
-        # 코사인 유사도 계산
-        similarity_scores = cosine_similarity(
-            self.content_matrix[recipe_index], 
-            self.content_matrix
-        ).flatten()
-        
-        # 가장 유사한 레시피 찾기 (자기 자신 제외)
-        similar_indices = similarity_scores.argsort()[::-1][1:n_recommendations+1]
-        
-        # 추천 레시피 상세 정보 추가
-        recommended_recipes = []
-        for idx in similar_indices:
-            recommended_recipes.append({
-                'recipe_id': self.recipes_df.loc[idx, 'recipe_id'],
-                'recipe_name': self.recipes_df.loc[idx, 'name'],
-                'similarity_score': similarity_scores[idx]
-            })
-        
-        return recommended_recipes
+        if len(idx1) > 0 and len(idx2) > 0:
+            similarity = cosine_similarity(
+                self.content_matrix[idx1[0]:idx1[0]+1], 
+                self.content_matrix[idx2[0]:idx2[0]+1]
+            )[0][0]
+            return float(similarity)
+        return 0.0
     
-    def recommend_recipes_from_history(self, recipe_ids, n_recommendations=5):
+    def recommend_recipes(self, recipe_ids, n_recommendations=5):
         """선택한 레시피들을 기반으로 추천"""
         recommendations = {}
+        selected_recipes = []
+        
+        # 선택된 레시피 정보 저장
+        for recipe_id in recipe_ids:
+            recipe_info = self.recipes_df[self.recipes_df['recipe_id'] == recipe_id]
+            if not recipe_info.empty:
+                selected_recipes.append({
+                    'recipe_id': recipe_id,
+                    'recipe_name': recipe_info['name'].values[0]
+                })
         
         # 각 선택된 레시피에 대해 유사한 레시피 찾기
         for recipe_id in recipe_ids:
-            recipe_indices = self.recipes_df[
+            recipe_idx = self.recipes_df[
                 self.recipes_df['recipe_id'] == recipe_id
             ].index
             
-            if len(recipe_indices) > 0:
-                recipe_index = recipe_indices[0]
-                
-                # 코사인 유사도 계산
+            if len(recipe_idx) > 0:
                 similarity_scores = cosine_similarity(
-                    self.content_matrix[recipe_index], 
+                    self.content_matrix[recipe_idx[0]:recipe_idx[0]+1], 
                     self.content_matrix
                 ).flatten()
                 
-                # 각 레시피와의 유사도 저장
                 for idx, score in enumerate(similarity_scores):
                     current_recipe_id = int(self.recipes_df.iloc[idx]['recipe_id'])
-                    if current_recipe_id not in recipe_ids:  # 이미 선택된 레시피 제외
+                    if current_recipe_id not in recipe_ids:
                         if current_recipe_id not in recommendations:
-                            recommendations[current_recipe_id] = 0
-                        recommendations[current_recipe_id] += float(score)
+                            recommendations[current_recipe_id] = {
+                                'score': 0,
+                                'similarities': {},
+                                'steps': self.recipes_df.iloc[idx]['steps'],
+                                'tags': eval(self.recipes_df.iloc[idx]['tags']) if not pd.isna(self.recipes_df.iloc[idx]['tags']) else []
+                            }
+                        recommendations[current_recipe_id]['score'] += score
+                        
+                        # 각 선택된 레시피와의 유사도 저장
+                        sim = self.get_similarity(current_recipe_id, recipe_id)
+                        recipe_name = next(r['recipe_name'] for r in selected_recipes if r['recipe_id'] == recipe_id)
+                        recommendations[current_recipe_id]['similarities'][recipe_id] = {
+                            'with_recipe': recipe_name,
+                            'similarity': sim
+                        }
         
-        # 유사도 기준으로 상위 n개 레시피 추천
+        # 상위 n개 추천
         top_recommendations = sorted(
             recommendations.items(), 
-            key=lambda x: x[1], 
+            key=lambda x: x[1]['score'], 
             reverse=True
         )[:n_recommendations]
         
-        # 추천 레시피 상세 정보 추가
-        recommended_recipes = []
-        for recipe_id, score in top_recommendations:
+        result = []
+        for recipe_id, info in top_recommendations:
             recipe_info = self.recipes_df[self.recipes_df['recipe_id'] == recipe_id]
             if not recipe_info.empty:
-                recommended_recipes.append({
-                    'recipe_id': int(recipe_id),
-                    'recipe_name': str(recipe_info['name'].values[0]),
-                    'similarity_score': float(score)
+                result.append({
+                    'recipe_id': recipe_id,
+                    'recipe_name': recipe_info['name'].values[0],
+                    'similarity_score': float(info['score']),
+                    'similarities': list(info['similarities'].values()),
+                    'steps': info['steps'],
+                    'tags': info['tags']
                 })
         
-        return recommended_recipes
+        return result

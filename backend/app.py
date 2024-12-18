@@ -5,6 +5,7 @@ from typing import List, Dict
 from main import RecipeRecommendationSystem
 from sqlalchemy.orm import Session
 from database import get_db, Recipe, Rating, User, UserPreference
+from sqlalchemy import func
 
 # Pydantic 모델 정의
 class RecipeSubmission(BaseModel):
@@ -35,8 +36,19 @@ async def get_recipes(
     db: Session = Depends(get_db)
 ):
     skip = (page - 1) * limit
-    recipes = db.query(Recipe).offset(skip).limit(limit).all()
-    total = db.query(Recipe).count()
+    
+    # 평점 4.5 이상의 레시피 필터링
+    recipes = (
+        db.query(Recipe)
+        .join(Rating, Recipe.recipe_id == Rating.recipe_id)
+        .group_by(Recipe.recipe_id)
+        .having(func.avg(Rating.rating) >= 4.5)
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
+    
+    total = db.query(Recipe).join(Rating, Recipe.recipe_id == Rating.recipe_id).group_by(Recipe.recipe_id).having(func.avg(Rating.rating) >= 4.5).count()
     
     return {
         "recipes": recipes,
@@ -51,11 +63,11 @@ async def get_recommendations(submission: RecipeSubmission):
     try:
         print(f"Received recipe_ids: {submission.recipe_ids}")
         
-        # 각 추천 방식별 결과
-        user_based_recs = recommender.recommend_user_based_from_history(
+        # hybrid 추천으로 변경
+        hybrid_recs = recommender.recommend_hybrid_from_history(
             submission.recipe_ids
         )
-        print(f"User-based recommendations: {user_based_recs}")
+        print(f"Hybrid recommendations: {hybrid_recs}")
         
         item_based_recs = recommender.recommend_item_based_from_history(
             submission.recipe_ids
@@ -68,7 +80,7 @@ async def get_recommendations(submission: RecipeSubmission):
         print(f"Content-based recommendations: {content_based_recs}")
         
         return {
-            "user_based": user_based_recs,
+            "hybrid": hybrid_recs,
             "item_based": item_based_recs,
             "content_based": content_based_recs
         }
@@ -129,8 +141,3 @@ async def get_user_preferences(
         UserPreference.user_id == user_id
     ).all()
     return preferences
-
-# uvicorn app:app --reload
-
-# http://127.0.0.1:8000/recipes
-# http://127.0.0.1:8000/recommend
