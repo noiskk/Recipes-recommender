@@ -22,3 +22,5 @@ Item-based
 Content-based
 
 Hybrid-based
+
+![localhost_3000_](https://github.com/user-attachments/assets/91fd7c7b-1284-4c40-a0b2-dc14deff7be2)
