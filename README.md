@@ -35,7 +35,7 @@ Hybrid-based
 2. 아이템 기반으로 후보와 사용자가 평가한 레시피 간의 유사도 계산
 3. 아이템 기반 점수로 상위 레시피 추천
 
-<br>
+<br><br>
 
 사용자가 레시피를 선택한 후 [추천 받기] 버튼을 누르면 3가지 방식으로 계산된 추천 항목이 제공된다. <br>
 추천 시스템의 성능을 측정하기 위한 방법에는 여러가지가 있지만 <br>
@@ -43,5 +43,5 @@ Precision 이나 Recall 같은 기법은 고려하지 않고 레시피 간의 �
 
 <br><br>
 
-
+추천 결과
 ![localhost_3000_](https://github.com/user-attachments/assets/91fd7c7b-1284-4c40-a0b2-dc14deff7be2)
