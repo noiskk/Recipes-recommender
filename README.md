@@ -1,6 +1,7 @@
 # Recipes-recommender
 
 사용된 데이터셋<br>
+**Food.com Recipes and Interactions**<br>
 [Dataset](https://www.kaggle.com/datasets/shuyangli94/food-com-recipes-and-user-interactions/data?select=RAW_interactions.csv)
 
 <br>
